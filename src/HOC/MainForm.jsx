@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Trash2, Loader2, CheckCircle2, User, Phone, Linkedin, Mail, Github, Globe, BookOpen, FileText, HelpCircle, Bookmark } from 'lucide-react'
+import { PlusCircle, Trash2, Loader2, CheckCircle2, User, Phone, Linkedin, Mail, Github, Globe, BookOpen, FileText, HelpCircle, Bookmark, MessageSquare, X, Link } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
@@ -38,6 +38,8 @@ const ProjectCollectorForm = () => {
     const { toast } = useToast()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [progress, setProgress] = useState(0)
+    const [isSubmitted, setIsSubmitted] = useState(false)
+    const [showThankYouMessage, setShowThankYouMessage] = useState(false)
 
     const handleChange = (e) => {
         const { name, value } = e.target
@@ -46,6 +48,7 @@ const ProjectCollectorForm = () => {
             localStorage.setItem('projectCollectorFormData', JSON.stringify(updatedData))
             return updatedData
         })
+        validateField(name, value) // Add this line to validate on change
     }
 
     const handleBlur = (e) => {
@@ -55,12 +58,23 @@ const ProjectCollectorForm = () => {
 
     const validateField = (name, value) => {
         let error = ''
-        if (name === 'whatsapp' && value && !/^\d{10}$/.test(value)) {
-            error = 'Please enter a 10-digit number'
-        } else if (name === 'linkedin' && value && !/^https:\/\/.*linkedin\.com.*$/.test(value)) {
-            error = 'Please enter a valid LinkedIn URL'
-        } else if (name === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-            error = 'Please enter a valid email address'
+        switch (name) {
+            case 'whatsapp':
+                if (value && !/^\d{10}$/.test(value)) {
+                    error = 'Please enter a 10-digit number'
+                }
+                break
+            case 'linkedin':
+                if (value && !/^https:\/\/.*linkedin\.com.*$/.test(value)) {
+                    error = 'Please enter a valid LinkedIn URL'
+                }
+                break
+            case 'email':
+                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                    error = 'Please enter a valid email address'
+                }
+                break
+            // Add more cases for other fields if needed
         }
         setErrors(prev => ({ ...prev, [name]: error }))
     }
@@ -171,6 +185,8 @@ const ProjectCollectorForm = () => {
             console.log('Response received:', response);
 
             // Since we can't read the response in 'no-cors' mode, we'll assume success if no error was thrown
+            setIsSubmitted(true)
+            setShowThankYouMessage(true)
             clearProjectDetails()
             toast({
                 title: "Project Submitted!",
@@ -193,6 +209,54 @@ const ProjectCollectorForm = () => {
         { id: 'project', title: 'Project Details' },
         { id: 'resources', title: 'Recommended Resources' }
     ]
+
+    const isFormValid = () => {
+        return formData.name && formData.linkedin && formData.email && formData.codebase && formData.title && formData.description && formData.problemStatement
+    }
+
+    const ThankYouMessage = () => (
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm"
+        >
+            <Card className="max-w-2xl w-full overflow-hidden shadow-2xl rounded-2xl bg-white/80 backdrop-blur-sm relative">
+                <Button
+                    onClick={() => setShowThankYouMessage(false)}
+                    className="absolute top-2 right-2 p-2"
+                    variant="ghost"
+                >
+                    <X className="h-6 w-6" />
+                </Button>
+                <CardHeader className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-8">
+                    <CardTitle className="text-3xl font-extrabold text-center font-museomoderno">
+                        Thank You for Contributing! 🎉
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="p-8 space-y-6 text-center">
+                    <p className="text-lg text-gray-700">
+                        We sincerely appreciate your effort in sharing your project with <strong>gameoftaksh.live</strong>! Your contribution helps us build a vibrant community of learners and innovators. 🌟
+                    </p>
+                    <p className="text-lg text-gray-700">
+                        To stay connected and collaborate further, we invite you to join our Discord server! 🤝💬 Let's continue the conversation, share ideas, and support each other on this exciting journey.
+                    </p>
+                    <Button
+                        onClick={() => window.open("https://discord.gg/tNXAH4WFKC", "_blank")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold py-2 px-4 rounded-full inline-flex items-center"
+                    >
+                        <MessageSquare className="mr-2" />
+                        Join our Discord
+                    </Button>
+                    <p className="text-lg font-semibold text-purple-600">
+                        Thank you once again for being a part of our mission! 🙌💖
+                    </p>
+                </CardContent>
+            </Card>
+        </motion.div>
+    )
 
     return (
         <motion.div
@@ -265,7 +329,7 @@ const ProjectCollectorForm = () => {
                                         />
                                         <InputField
                                             icon={<Phone className="text-purple-500" />}
-                                            label="WhatsApp Number (Optional)"
+                                            label="WhatsApp Number"
                                             name="whatsapp"
                                             value={formData.whatsapp}
                                             onChange={handleChange}
@@ -305,18 +369,18 @@ const ProjectCollectorForm = () => {
                                     <div className="space-y-6">
                                         <InputField
                                             icon={<Github className="text-purple-500" />}
-                                            label="Project Codebase (GitHub Link)"
+                                            label="Project Link (e.g. GitHub, Drive, etc.)"
                                             name="codebase"
                                             value={formData.codebase}
                                             onChange={handleChange}
                                             onBlur={handleBlur}
                                             error={errors.codebase}
-                                            placeholder="GitHub repository link"
+                                            placeholder="Project link"
                                             required
                                         />
                                         <InputField
                                             icon={<Globe className="text-purple-500" />}
-                                            label="Live Demo (Optional)"
+                                            label="Live Demo(if any)"
                                             name="demo"
                                             value={formData.demo}
                                             onChange={handleChange}
@@ -433,7 +497,7 @@ const ProjectCollectorForm = () => {
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
-                        <Button type="submit" disabled={isSubmitting} className="bg-purple-600 hover:bg-purple-700">
+                        <Button type="submit" disabled={isSubmitting || !isFormValid()} className="bg-purple-600 hover:bg-purple-700">
                             {isSubmitting ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -446,26 +510,38 @@ const ProjectCollectorForm = () => {
                     </CardFooter>
                 </Card>
             </form>
+            {showThankYouMessage && <ThankYouMessage />}
         </motion.div>
     )
 }
 
-const InputField = ({ icon, label, name, error, ...props }) => (
+const InputField = ({ icon, label, name, error, required, ...props }) => (
     <div className="space-y-2">
         <Label htmlFor={name} className="text-sm font-medium text-gray-700 flex items-center font-nunito">
             {icon}
-            <span className="ml-2">{label}</span>
+            <span className="ml-2">
+                {label}
+                {required && <span className="text-red-500 ml-1">*</span>}
+            </span>
         </Label>
-        <Input id={name} name={name} className="w-full font-nunito" {...props} />
+        <Input
+            id={name}
+            name={name}
+            className={`w-full font-nunito ${error ? 'border-red-500' : ''}`}
+            {...props}
+        />
         {error && <p className="text-red-500 text-sm font-nunito">{error}</p>}
     </div>
 )
 
-const TextareaField = ({ icon, label, name, error, ...props }) => (
+const TextareaField = ({ icon, label, name, error, required, ...props }) => (
     <div className="space-y-2">
         <Label htmlFor={name} className="text-sm font-medium text-gray-700 flex items-center font-nunito">
             {icon}
-            <span className="ml-2">{label}</span>
+            <span className="ml-2">
+                {label}
+                {required && <span className="text-red-500 ml-1">*</span>}
+            </span>
         </Label>
         <Textarea id={name} name={name} className="w-full font-nunito" {...props} />
         {error && <p className="text-red-500 text-sm font-nunito">{error}</p>}
