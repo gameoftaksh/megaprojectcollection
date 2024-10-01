@@ -48,6 +48,7 @@ const ProjectCollectorForm = () => {
             localStorage.setItem('projectCollectorFormData', JSON.stringify(updatedData))
             return updatedData
         })
+        validateField(name, value) // Add this line to validate on change
     }
 
     const handleBlur = (e) => {
@@ -57,12 +58,23 @@ const ProjectCollectorForm = () => {
 
     const validateField = (name, value) => {
         let error = ''
-        if (name === 'whatsapp' && value && !/^\d{10}$/.test(value)) {
-            error = 'Please enter a 10-digit number'
-        } else if (name === 'linkedin' && value && !/^https:\/\/.*linkedin\.com.*$/.test(value)) {
-            error = 'Please enter a valid LinkedIn URL'
-        } else if (name === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-            error = 'Please enter a valid email address'
+        switch (name) {
+            case 'whatsapp':
+                if (value && !/^\d{10}$/.test(value)) {
+                    error = 'Please enter a 10-digit number'
+                }
+                break
+            case 'linkedin':
+                if (value && !/^https:\/\/.*linkedin\.com.*$/.test(value)) {
+                    error = 'Please enter a valid LinkedIn URL'
+                }
+                break
+            case 'email':
+                if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                    error = 'Please enter a valid email address'
+                }
+                break
+            // Add more cases for other fields if needed
         }
         setErrors(prev => ({ ...prev, [name]: error }))
     }
@@ -317,7 +329,7 @@ const ProjectCollectorForm = () => {
                                         />
                                         <InputField
                                             icon={<Phone className="text-purple-500" />}
-                                            label="WhatsApp Number (Optional)"
+                                            label="WhatsApp Number"
                                             name="whatsapp"
                                             value={formData.whatsapp}
                                             onChange={handleChange}
@@ -357,18 +369,18 @@ const ProjectCollectorForm = () => {
                                     <div className="space-y-6">
                                         <InputField
                                             icon={<Github className="text-purple-500" />}
-                                            label="Project Codebase (GitHub Link)"
+                                            label="Project Link (e.g. GitHub, Drive, etc.)"
                                             name="codebase"
                                             value={formData.codebase}
                                             onChange={handleChange}
                                             onBlur={handleBlur}
                                             error={errors.codebase}
-                                            placeholder="GitHub repository link"
+                                            placeholder="Project link"
                                             required
                                         />
                                         <InputField
                                             icon={<Globe className="text-purple-500" />}
-                                            label="Live Demo (Optional)"
+                                            label="Live Demo(if any)"
                                             name="demo"
                                             value={formData.demo}
                                             onChange={handleChange}
@@ -512,7 +524,12 @@ const InputField = ({ icon, label, name, error, required, ...props }) => (
                 {required && <span className="text-red-500 ml-1">*</span>}
             </span>
         </Label>
-        <Input id={name} name={name} className="w-full font-nunito" {...props} />
+        <Input
+            id={name}
+            name={name}
+            className={`w-full font-nunito ${error ? 'border-red-500' : ''}`}
+            {...props}
+        />
         {error && <p className="text-red-500 text-sm font-nunito">{error}</p>}
     </div>
 )
