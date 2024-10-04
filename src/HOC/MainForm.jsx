@@ -404,7 +404,7 @@ const ProjectCollectorForm = () => {
                                 animate={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.4, duration: 0.5 }}
                             >
-                                Share your amazing project and inspire others!
+                                No project is a small project!
                             </motion.span>
                         </CardDescription>
                     </CardHeader>

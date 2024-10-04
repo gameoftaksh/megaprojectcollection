@@ -3,12 +3,11 @@ import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
 export default defineConfig({
-  base: '/megaprojectcollection/',
   plugins: [react()],
+  base: '/megaprojectcollection/',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
 })
-
