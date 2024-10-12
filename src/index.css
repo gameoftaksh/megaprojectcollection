@@ -7,3 +7,16 @@
     --radius: 0.5rem
   }
 }
+
+.sortable-ghost {
+  opacity: 0.5;
+  /* Make the ghost item semi-transparent */
+  background-color: #f0f0f0;
+  /* Change background color */
+  border: 1px dashed #ccc;
+  /* Optional: add a border */
+}
+
+html {
+  scroll-behavior: smooth;
+}

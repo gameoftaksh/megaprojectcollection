@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
-import { PlusCircle, Trash2, Loader2, CheckCircle2, User, Phone, Linkedin, Mail, Github, Globe, BookOpen, FileText, HelpCircle, Bookmark, MessageSquare, X, Link, Plus, Minus, Instagram, Twitter, Zap, Sparkles, ArrowRight } from 'lucide-react'
+import { PlusCircle, Trash2, Loader2, CheckCircle2, User, Phone, Linkedin, Mail, Github, Globe, BookOpen, FileText, HelpCircle, Bookmark, MessageSquare, X, Link, Plus, Minus, Instagram, Twitter, Zap, Sparkles, ArrowRight, GripVertical } from 'lucide-react'
 import { useToast } from "@/hooks/use-toast"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import Sortable from 'sortablejs' // Add this import
 
 // Add this function at the top of your file, outside of any component
 const isValidUrl = (string) => {
@@ -43,6 +44,8 @@ const isValidUrl = (string) => {
     }
 }
 
+const generateId = () => '_' + Math.random().toString(36).substr(2, 9); // Function to generate unique IDs
+
 const ProjectCollectorForm = () => {
     const [formData, setFormData] = useState(() => {
         const savedData = localStorage.getItem('projectCollectorFormData')
@@ -55,7 +58,7 @@ const ProjectCollectorForm = () => {
             demo: '',
             title: '',
             description: '',
-            resources: [{ remark: '', link: '' }],
+            resources: [{ id: generateId(), remark: '', link: '' }],
             problemStatement: ''
         }
     })
@@ -118,14 +121,17 @@ const ProjectCollectorForm = () => {
         setErrors(prev => ({ ...prev, [name]: error }))
     }
 
-    const handleResourceChange = (index, field, value) => {
-        const updatedResources = [...formData.resources]
-        updatedResources[index][field] = value
-        setFormData(prev => {
-            const updatedData = { ...prev, resources: updatedResources }
-            localStorage.setItem('projectCollectorFormData', JSON.stringify(updatedData))
-            return updatedData
-        })
+    const handleResourceChange = (id, field, value) => {
+        const updatedResources = formData.resources.map(resource => {
+            if (resource.id === id) {
+                return { ...resource, [field]: value };
+            }
+            return resource;
+        });
+        setFormData(prev => ({
+            ...prev,
+            resources: updatedResources
+        }));
 
         // Validate URL for resource links
         if (field === 'link') {
@@ -134,30 +140,24 @@ const ProjectCollectorForm = () => {
                 ...prev,
                 resources: {
                     ...prev.resources,
-                    [index]: { ...prev.resources?.[index], link: error }
+                    [id]: { ...prev.resources?.[id], link: error }
                 }
             }))
         }
     }
 
     const addResource = () => {
-        setFormData(prev => {
-            const updatedData = {
-                ...prev,
-                resources: [...prev.resources, { remark: '', link: '' }]
-            }
-            localStorage.setItem('projectCollectorFormData', JSON.stringify(updatedData))
-            return updatedData
-        })
+        setFormData(prev => ({
+            ...prev,
+            resources: [...prev.resources, { id: generateId(), remark: '', link: '' }]
+        }));
     }
 
-    const removeResource = (index) => {
-        setFormData(prev => {
-            const updatedResources = prev.resources.filter((_, i) => i !== index)
-            const updatedData = { ...prev, resources: updatedResources }
-            localStorage.setItem('projectCollectorFormData', JSON.stringify(updatedData))
-            return updatedData
-        })
+    const removeResource = (id) => {
+        setFormData(prev => ({
+            ...prev,
+            resources: prev.resources.filter(resource => resource.id !== id)
+        }));
     }
 
     const calculateProgress = () => {
@@ -184,7 +184,7 @@ const ProjectCollectorForm = () => {
             demo: '',
             title: '',
             description: '',
-            resources: [{ remark: '', link: '' }],
+            resources: [{ id: generateId(), remark: '', link: '' }],
             problemStatement: ''
         })
         setErrors({})
@@ -201,7 +201,7 @@ const ProjectCollectorForm = () => {
             demo: '',
             title: '',
             description: '',
-            resources: [{ remark: '', link: '' }],
+            resources: [{ id: generateId(), remark: '', link: '' }],
             problemStatement: ''
         }))
         setErrors({})
@@ -212,53 +212,60 @@ const ProjectCollectorForm = () => {
     }
 
     const handleSubmit = async (e) => {
-        e.preventDefault()
-        setIsSubmitting(true)
+        e.preventDefault();
+        setIsSubmitting(true);
 
-        const url = 'https://script.google.com/macros/s/AKfycbya1Sjm8jyJxrD-qSuP0QL9gOqqlv5ETa-ZAoZ1Z1s_aZ4xDYnp-y_FuuLQTcLbf794/exec'
+        const url = 'https://script.google.com/macros/s/AKfycbya1Sjm8jyJxrD-qSuP0QL9gOqqlv5ETa-ZAoZ1Z1s_aZ4xDYnp-y_FuuLQTcLbf794/exec';
 
         try {
-            // Filter out empty resources
-            const filteredResources = formData.resources.filter(
-                resource => resource.remark.trim() !== '' || resource.link.trim() !== ''
-            );
+            // Filter and format resources correctly as objects with 'remark' and 'link' keys
+            const formattedResources = formData.resources
+                .filter(resource => resource.remark.trim() || resource.link.trim()) // Keep non-empty entries
+                .map(({ remark, link }) => ({ remark, link })); // Keep key-value pairs as objects
 
-            // Prepare the data in the format expected by the Google Apps Script
+            // Prepare the data for submission
             const dataToSend = {
                 ...formData,
-                resources: JSON.stringify(filteredResources)
+                resources: JSON.stringify(formattedResources), // Convert to JSON string for sending
             };
 
-            const response = await fetch(url, {
+            const fetchWithTimeout = (url, options, timeout = 10000) => {
+                return Promise.race([
+                    fetch(url, options),
+                    new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Request timed out')), timeout)
+                    ),
+                ]);
+            };
+
+            const response = await fetchWithTimeout(url, {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(dataToSend)
-            })
+                body: JSON.stringify(dataToSend),
+            });
 
-            console.log('Response received:', response);
 
-            // Since we can't read the response in 'no-cors' mode, we'll assume success if no error was thrown
-            setIsSubmitted(true)
-            setShowThankYouMessage(true)
-            clearProjectDetails()
+            setIsSubmitted(true);
+            setShowThankYouMessage(true);
+            clearProjectDetails();
             toast({
                 title: "Project Submitted!",
                 description: "Thank you for sharing your amazing project with us!",
-            })
+            });
         } catch (error) {
-            console.error('Error submitting form:', error)
+            console.error('Error submitting form:', error);
             toast({
                 title: "Submission Error",
                 description: "There was an error submitting your project. Please try again.",
-                variant: "destructive"
-            })
+                variant: "destructive",
+            });
         } finally {
-            setIsSubmitting(false)
+            setIsSubmitting(false);
         }
-    }
+    };
 
     const sections = [
         { id: 'personal', title: 'Personal Information' },
@@ -285,13 +292,16 @@ const ProjectCollectorForm = () => {
                 className="bg-gradient-to-br from-purple-600 to-indigo-700 rounded-3xl shadow-2xl overflow-hidden max-w-lg w-full border border-purple-400/30"
             >
                 <div className="relative p-8">
-                    <Button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 text-purple-200 hover:text-white hover:bg-white/20 rounded-full p-2 transition-colors duration-200"
-                        variant="ghost"
-                    >
-                        <X className="h-6 w-6" />
-                    </Button>
+                    {/* Wrap the close button in a larger clickable area */}
+                    <div className="absolute top-4 right-4">
+                        <Button
+                            onClick={onClose}
+                            className="text-purple-200 hover:text-white hover:bg-white/20 rounded-full p-2 transition-colors duration-200 ease-in-out shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                            variant="ghost"
+                        >
+                            <X className="h-6 w-6" />
+                        </Button>
+                    </div>
                     <motion.div
                         initial={{ y: -20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -308,16 +318,16 @@ const ProjectCollectorForm = () => {
                     >
                         Thank You for Contributing!
                     </motion.h2>
-                    <motion.p
+                    <motion.div // Changed from <motion.p> to <motion.div>
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ delay: 0.4 }}
                         className="text-purple-100 text-left mb-6"
                     >
-                        <p className="text-purple-50 text-center">
+                        <div className="text-purple-50 text-center">
                             Your contribution is invaluable in helping us build a vibrant community of learners and innovators. 🌟
-                        </p>
-                    </motion.p>
+                        </div>
+                    </motion.div>
                     <motion.div
                         initial={{ y: 20, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
@@ -325,7 +335,6 @@ const ProjectCollectorForm = () => {
                         className="bg-white/10 rounded-2xl p-6 mb-6"
                     >
                         <p className="text-purple-50 text-center">To stay connected and collaborate further, we invite you to join our Discord server! 🤝💬</p>
-
                     </motion.div>
                     <motion.div
                         initial={{ y: 20, opacity: 0 }}
@@ -333,12 +342,10 @@ const ProjectCollectorForm = () => {
                         transition={{ delay: 0.6 }}
                         className="flex justify-center mb-6"
                     >
-
                         <Button
                             onClick={() => window.open("https://discord.gg/tNXAH4WFKC", "_blank")}
                             className="bg-white text-purple-700 hover:bg-purple-100 font-bold py-3 px-6 rounded-full text-lg transition-all duration-300 hover:shadow-lg hover:shadow-purple-500/50 group"
                         >
-
                             <MessageSquare className="mr-2 h-5 w-5" />
                             Join Our Discord
                             <ArrowRight className="ml-2 h-5 w-5 transition-transform duration-300 group-hover:translate-x-1" />
@@ -365,7 +372,7 @@ const ProjectCollectorForm = () => {
                 </motion.div>
             </motion.div>
         </motion.div>
-    )
+    );
 
     const SocialButton = ({ icon, href }) => (
         <Button
@@ -377,6 +384,28 @@ const ProjectCollectorForm = () => {
             {icon}
         </Button>
     )
+
+    // Initialize Sortable on the resources list
+    useEffect(() => {
+        const el = document.getElementById('resources-list');
+        const sortable = Sortable.create(el, {
+            animation: 150, // Duration of the animation in milliseconds
+            ghostClass: 'sortable-ghost', // Class name for the item being dragged
+            onEnd: (event) => {
+                const updatedResources = Array.from(formData.resources);
+                const [movedItem] = updatedResources.splice(event.oldIndex, 1);
+                updatedResources.splice(event.newIndex, 0, movedItem);
+                setFormData(prev => ({
+                    ...prev,
+                    resources: updatedResources // Update the state with the new order
+                }));
+            }
+        });
+
+        return () => {
+            sortable.destroy(); // Cleanup on unmount
+        };
+    }, [formData.resources]);
 
     return (
         <motion.div
@@ -547,12 +576,11 @@ const ProjectCollectorForm = () => {
                                 {section.id === 'resources' && (
                                     <div className="space-y-6">
                                         <div className='bg-purple-100 rounded-md p-2 text-purple-800 text-center text-sm align-middle flex items-center justify-center font-semibold'> Share the resources you used to build this project</div>
-                                        <div className="space-y-4">
-                                            {formData.resources.map((resource, index) => (
+                                        <div id="resources-list" className="space-y-4">
+                                            {formData.resources.map((resource) => (
                                                 <ResourceCard
-                                                    key={index}
+                                                    key={resource.id} // Use unique ID as key
                                                     resource={resource}
-                                                    index={index}
                                                     handleResourceChange={handleResourceChange}
                                                     removeResource={removeResource}
                                                     errors={errors}
@@ -650,56 +678,75 @@ const TextareaField = ({ icon, label, name, error, required, ...props }) => (
     </div>
 )
 
-const ResourceCard = ({ resource, index, handleResourceChange, removeResource, errors }) => (
-    <Card className="bg-purple-50 border-purple-200">
-        <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-purple-700 flex justify-between items-center">
-                Resource {index + 1}
+const ResourceCard = ({ resource, handleResourceChange, removeResource, errors }) => (
+    <Card className="bg-purple-50 border-purple-200 relative">
+        {/* Header */}
+        <CardHeader className="pb-2 flex items-center justify-between">
+            {/* Left Section: Grip Icon + Title aligned to top-left */}
+            <div className="flex items-center space-x-2 absolute top-2 left-2">
                 <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeResource(index)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-100 p-1 h-auto"
+                    className="text-purple-500 hover:text-purple-700 p-1"
                 >
-                    <Minus className="h-4 w-4" />
+                    <GripVertical className="h-5 w-5" />
                 </Button>
-            </CardTitle>
+                <CardTitle className="text-lg font-semibold text-purple-700">
+                    Resource
+                </CardTitle>
+            </div>
+
+            {/* Delete Button at top-right corner */}
+            <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                onClick={() => removeResource(resource.id)}
+                className="text-red-500 hover:text-red-700 hover:bg-red-100 p-2 h-auto absolute top-2 right-2"
+            >
+                <Minus className="h-5 w-5" />
+            </Button>
         </CardHeader>
-        <CardContent className="space-y-4">
+
+        {/* Content */}
+        <CardContent className="mt-12 space-y-4">
+            {/* Description Field */}
             <div className="space-y-2">
-                <Label htmlFor={`resource-desc-${index}`} className="text-sm font-medium text-purple-600">
+                <Label htmlFor={`resource-desc-${resource.id}`} className="text-sm font-medium text-purple-600">
                     Description
                 </Label>
                 <Input
-                    id={`resource-desc-${index}`}
+                    id={`resource-desc-${resource.id}`}
                     placeholder="e.g., Official Documentation"
                     value={resource.remark}
-                    onChange={(e) => handleResourceChange(index, 'remark', e.target.value)}
+                    onChange={(e) => handleResourceChange(resource.id, 'remark', e.target.value)}
                     className="bg-white border-purple-200 focus:border-purple-400 focus:ring-purple-400"
                 />
             </div>
+
+            {/* Link Field */}
             <div className="space-y-2">
-                <Label htmlFor={`resource-link-${index}`} className="text-sm font-medium text-purple-600">
+                <Label htmlFor={`resource-link-${resource.id}`} className="text-sm font-medium text-purple-600">
                     Link
                 </Label>
                 <div className="relative">
                     <Input
-                        id={`resource-link-${index}`}
+                        id={`resource-link-${resource.id}`}
                         placeholder="https://example.com"
                         value={resource.link}
-                        onChange={(e) => handleResourceChange(index, 'link', e.target.value)}
-                        className={`bg-white border-purple-200 focus:border-purple-400 focus:ring-purple-400 pl-10 ${errors?.resources?.[index]?.link ? 'border-red-500' : ''
+                        onChange={(e) => handleResourceChange(resource.id, 'link', e.target.value)}
+                        className={`bg-white border-purple-200 focus:border-purple-400 focus:ring-purple-400 pl-10 ${errors?.resources?.[resource.id]?.link ? 'border-red-500' : ''
                             }`}
                     />
                     <Link className="absolute left-3 top-1/2 transform -translate-y-1/2 text-purple-400 h-4 w-4" />
                 </div>
-                {errors?.resources?.[index]?.link && (
-                    <p className="text-red-500 text-sm">{errors.resources[index].link}</p>
+                {errors?.resources?.[resource.id]?.link && (
+                    <p className="text-red-500 text-sm">{errors.resources[resource.id].link}</p>
                 )}
             </div>
         </CardContent>
     </Card>
-)
+);
 
 export default ProjectCollectorForm
